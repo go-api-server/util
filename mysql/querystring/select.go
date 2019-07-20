@@ -34,9 +34,12 @@ func SelectArray(fieldArray []string, from string) *selectString {
 	}
 }
 
-func SelectObject(object string, from string) *selectString {
+func SelectObject(object interface{}, from string) *selectString {
 	fieldArray := make([]string, 0)
 	valueof := reflect.ValueOf(object)
+	if valueof.Type().Kind() == reflect.Ptr {
+		valueof = valueof.Elem()
+	}
 	if valueof.Type().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("querystring[SelectObject] %s is not a struct", valueof.Type().Name()))
 	}
@@ -129,7 +132,7 @@ func (this *selectString) GetSQL() string {
 	return this.wherePtr.ToString()
 }
 
-func (this *selectString) Fetch(out interface{}, row *sql.Row) (bool, error) {
+func (this *selectString) FetchRow(out interface{}, row *sql.Row) (bool, error) {
 	dest := reflect.ValueOf(out)
 
 	if dest.Type().Kind() == reflect.Ptr {
@@ -181,7 +184,7 @@ func (this *selectString) Fetch(out interface{}, row *sql.Row) (bool, error) {
 	return false, nil
 }
 
-func (this *selectString) FetchRows(out interface{}, rows *sql.Row) (bool, error) {
+func (this *selectString) Fetch(out interface{}, rows *sql.Rows) (bool, error) {
 	dest := reflect.ValueOf(out)
 
 	if dest.Type().Kind() == reflect.Ptr {

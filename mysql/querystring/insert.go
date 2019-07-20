@@ -29,7 +29,7 @@ func (this *insertString) GetSQL() string {
 		strings.Join(valueArray, ","))
 }
 
-func (this *insertString) Insert(fieldAndValue map[string]interface{}) *insertString {
+func (this *insertString) SetFieldAndValue(fieldAndValue map[string]interface{}) *insertString {
 	this.fieldArray = make([]string, len(fieldAndValue))
 	valueArray := make([]string, len(fieldAndValue))
 	index := 0
@@ -42,11 +42,15 @@ func (this *insertString) Insert(fieldAndValue map[string]interface{}) *insertSt
 	return this
 }
 
-func (this *insertString) InsertObject(object interface{}) *insertString {
+func (this *insertString) SetObject(object interface{}) *insertString {
 	this.fieldArray = make([]string, 0)
 	valueArray := make([]string, 0)
 
 	valueof := reflect.ValueOf(object)
+	if valueof.Type().Kind() == reflect.Ptr {
+		valueof = valueof.Elem()
+	}
+
 	if valueof.Type().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("querystring[InsertObject] %s is not a struct", valueof.Type().Name()))
 	}
@@ -57,6 +61,9 @@ func (this *insertString) InsertObject(object interface{}) *insertString {
 			continue
 		}
 		tagArray := strings.Split(tags, ",")
+		if len(tagArray) > 0 && strings.ToLower(tagArray[1]) == "auto_increment" {
+			continue
+		}
 		this.fieldArray = append(this.fieldArray, tagArray[0])
 		switch valueof.Type().Field(i).Type.Kind() {
 		case reflect.String:
