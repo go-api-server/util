@@ -6,20 +6,20 @@ import (
 	"strings"
 )
 
-type insertString struct {
+type insertSQL struct {
 	table      string
 	fieldArray []string
 	valueArray [][]string
 }
 
-func InsertInto(table string) *insertString {
-	return &insertString{
+func InsertInto(table string) *insertSQL {
+	return &insertSQL{
 		table:      table,
 		valueArray: make([][]string, 0),
 	}
 }
 
-func (this *insertString) GetSQL() string {
+func (this *insertSQL) GetSQL() string {
 	valueArray := make([]string, len(this.valueArray))
 	for i, v := range this.valueArray {
 		valueArray[i] = fmt.Sprintf("(%s)", strings.Join(v, ","))
@@ -29,7 +29,7 @@ func (this *insertString) GetSQL() string {
 		strings.Join(valueArray, ","))
 }
 
-func (this *insertString) SetFieldAndValue(fieldAndValue map[string]interface{}) *insertString {
+func (this *insertSQL) SetFieldAndValue(fieldAndValue map[string]interface{}) *insertSQL {
 	this.fieldArray = make([]string, len(fieldAndValue))
 	valueArray := make([]string, len(fieldAndValue))
 	index := 0
@@ -42,7 +42,7 @@ func (this *insertString) SetFieldAndValue(fieldAndValue map[string]interface{})
 	return this
 }
 
-func (this *insertString) SetObject(object interface{}) *insertString {
+func (this *insertSQL) SetObject(object interface{}) *insertSQL {
 	this.fieldArray = make([]string, 0)
 	valueArray := make([]string, 0)
 

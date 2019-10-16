@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type whereString struct {
+type whereMaker struct {
 	command    string
 	table      string
 	fields     string
@@ -19,8 +19,8 @@ type whereString struct {
 	limit      int64
 }
 
-func newWhereString(command string, table string, fields string) *whereString {
-	return &whereString{
+func newWhereMaker(command string, table string, fields string) *whereMaker {
+	return &whereMaker{
 		command:    command,
 		table:      table,
 		fields:     fields,
@@ -29,7 +29,7 @@ func newWhereString(command string, table string, fields string) *whereString {
 	}
 }
 
-func (this *whereString) ToString() string {
+func (this *whereMaker) ToString() string {
 	sqlString := ""
 
 	if this.command == "SELECT" {
@@ -68,12 +68,12 @@ func (this *whereString) ToString() string {
 	return sqlString
 }
 
-func (this *whereString) Where(where string) *whereString {
+func (this *whereMaker) Where(where string) *whereMaker {
 	this.whereArray = append(this.whereArray, where)
 	return this
 }
 
-func (this *whereString) appendWhereString(field string, cmp string, value interface{}) {
+func (this *whereMaker) appendWhereString(field string, cmp string, value interface{}) {
 	valueof := reflect.ValueOf(value)
 	switch valueof.Type().Kind() {
 	case reflect.String:
@@ -89,32 +89,32 @@ func (this *whereString) appendWhereString(field string, cmp string, value inter
 	}
 }
 
-func (this *whereString) EQ(field string, value interface{}) *whereString {
+func (this *whereMaker) EQ(field string, value interface{}) *whereMaker {
 	this.appendWhereString(field, "=", value)
 	return this
 }
 
-func (this *whereString) GT(field string, value interface{}) *whereString {
+func (this *whereMaker) GT(field string, value interface{}) *whereMaker {
 	this.appendWhereString(field, ">", value)
 	return this
 }
 
-func (this *whereString) GE(field string, value interface{}) *whereString {
+func (this *whereMaker) GE(field string, value interface{}) *whereMaker {
 	this.appendWhereString(field, ">=", value)
 	return this
 }
 
-func (this *whereString) LT(field string, value interface{}) *whereString {
+func (this *whereMaker) LT(field string, value interface{}) *whereMaker {
 	this.appendWhereString(field, "<", value)
 	return this
 }
 
-func (this *whereString) LE(field string, value interface{}) *whereString {
+func (this *whereMaker) LE(field string, value interface{}) *whereMaker {
 	this.appendWhereString(field, "<=", value)
 	return this
 }
 
-func (this *whereString) IN(field string, intArray []int64) *whereString {
+func (this *whereMaker) IN(field string, intArray []int64) *whereMaker {
 	stringArray := make([]string, len(intArray))
 	for i, v := range intArray {
 		stringArray[i] = strconv.FormatInt(v, 64)
@@ -123,38 +123,38 @@ func (this *whereString) IN(field string, intArray []int64) *whereString {
 	return this
 }
 
-func (this *whereString) Between(field string, min int, max int) *whereString {
+func (this *whereMaker) Between(field string, min int, max int) *whereMaker {
 	this.appendWhereString(field, ">=", min)
 	this.appendWhereString(field, "<", max)
 	return this
 }
 
-func (this *whereString) LeftJoin(table string, on string) *whereString {
+func (this *whereMaker) LeftJoin(table string, on string) *whereMaker {
 	this.joinArray = append(this.joinArray, fmt.Sprintf("LEFT JOIN %s ON %s", table, on))
 	return this
 }
 
-func (this *whereString) RightJoin(table string, on string) *whereString {
+func (this *whereMaker) RightJoin(table string, on string) *whereMaker {
 	this.joinArray = append(this.joinArray, fmt.Sprintf("RIGHT JOIN %s ON %s", table, on))
 	return this
 }
 
-func (this *whereString) GroupBy(group string) *whereString {
+func (this *whereMaker) GroupBy(group string) *whereMaker {
 	this.group = group
 	return this
 }
 
-func (this *whereString) OrderBy(order string) *whereString {
+func (this *whereMaker) OrderBy(order string) *whereMaker {
 	this.order = order
 	return this
 }
 
-func (this *whereString) Offset(pos int64) *whereString {
+func (this *whereMaker) Offset(pos int64) *whereMaker {
 	this.start = pos
 	return this
 }
 
-func (this *whereString) Limit(limit int64) *whereString {
+func (this *whereMaker) Limit(limit int64) *whereMaker {
 	this.limit = limit
 	return this
 }

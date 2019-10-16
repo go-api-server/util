@@ -5,36 +5,33 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
-type selectString struct {
-	fieldArray map[string]int
-	wherePtr   *whereString
+type selectSQL struct {
+	wherePtr *whereMaker
 }
 
-func Count(table string) *selectString {
-	return &selectString{
-		fieldArray: make(map[string]int),
-		wherePtr:   newWhereString("SELECT", table, "COUNT(*)"),
+func Count(table string) *selectSQL {
+	return &selectSQL{
+		wherePtr: newWhereMaker("SELECT", table, "COUNT(*)"),
 	}
 }
 
-func Select(fields string, from string) *selectString {
-	return &selectString{
-		fieldArray: make(map[string]int),
-		wherePtr:   newWhereString("SELECT", from, fields),
+func Select(fields string, from string) *selectSQL {
+	return &selectSQL{
+		wherePtr: newWhereMaker("SELECT", from, fields),
 	}
 }
 
-func SelectArray(fieldArray []string, from string) *selectString {
-	return &selectString{
-		fieldArray: make(map[string]int),
-		wherePtr:   newWhereString("SELECT", from, strings.Join(fieldArray, ",")),
+func SelectArray(fieldArray []string, from string) *selectSQL {
+	return &selectSQL{
+		wherePtr: newWhereMaker("SELECT", from, strings.Join(fieldArray, ",")),
 	}
 }
 
-func SelectObject(object interface{}, from string) *selectString {
+func SelectObject(object interface{}, from string) *selectSQL {
 	fieldArray := make([]string, 0)
 	valueof := reflect.ValueOf(object)
 	if valueof.Type().Kind() == reflect.Ptr {
@@ -51,88 +48,87 @@ func SelectObject(object interface{}, from string) *selectString {
 		tagArray := strings.Split(tags, ",")
 		fieldArray = append(fieldArray, tagArray[0])
 	}
-	return &selectString{
-		fieldArray: make(map[string]int),
-		wherePtr:   newWhereString("SELECT", from, strings.Join(fieldArray, ",")),
+	return &selectSQL{
+		wherePtr: newWhereMaker("SELECT", from, strings.Join(fieldArray, ",")),
 	}
 }
 
-func (this *selectString) Where(where string) *selectString {
+func (this *selectSQL) Where(where string) *selectSQL {
 	this.wherePtr.Where(where)
 	return this
 }
 
-func (this *selectString) EQ(field string, value interface{}) *selectString {
+func (this *selectSQL) EQ(field string, value interface{}) *selectSQL {
 	this.wherePtr.EQ(field, value)
 	return this
 }
 
-func (this *selectString) GT(field string, value interface{}) *selectString {
+func (this *selectSQL) GT(field string, value interface{}) *selectSQL {
 	this.wherePtr.GT(field, value)
 	return this
 }
 
-func (this *selectString) GE(field string, value interface{}) *selectString {
+func (this *selectSQL) GE(field string, value interface{}) *selectSQL {
 	this.wherePtr.GE(field, value)
 	return this
 }
 
-func (this *selectString) LT(field string, value interface{}) *selectString {
+func (this *selectSQL) LT(field string, value interface{}) *selectSQL {
 	this.wherePtr.LT(field, value)
 	return this
 }
 
-func (this *selectString) LE(field string, value interface{}) *selectString {
+func (this *selectSQL) LE(field string, value interface{}) *selectSQL {
 	this.wherePtr.LE(field, value)
 	return this
 }
 
-func (this *selectString) IN(field string, intArray []int64) *selectString {
+func (this *selectSQL) IN(field string, intArray []int64) *selectSQL {
 	this.wherePtr.IN(field, intArray)
 	return this
 }
 
-func (this *selectString) Between(field string, min int, max int) *selectString {
+func (this *selectSQL) Between(field string, min int, max int) *selectSQL {
 	this.wherePtr.GE(field, min)
 	this.wherePtr.LT(field, max)
 	return this
 }
 
-func (this *selectString) LeftJoin(table string, on string) *selectString {
+func (this *selectSQL) LeftJoin(table string, on string) *selectSQL {
 	this.wherePtr.LeftJoin(table, on)
 	return this
 }
 
-func (this *selectString) RightJoin(table string, on string) *selectString {
+func (this *selectSQL) RightJoin(table string, on string) *selectSQL {
 	this.wherePtr.RightJoin(table, on)
 	return this
 }
 
-func (this *selectString) GroupBy(group string) *selectString {
+func (this *selectSQL) GroupBy(group string) *selectSQL {
 	this.wherePtr.GroupBy(group)
 	return this
 }
 
-func (this *selectString) OrderBy(order string) *selectString {
+func (this *selectSQL) OrderBy(order string) *selectSQL {
 	this.wherePtr.OrderBy(order)
 	return this
 }
 
-func (this *selectString) Offset(pos int64) *selectString {
+func (this *selectSQL) Offset(pos int64) *selectSQL {
 	this.wherePtr.Offset(pos)
 	return this
 }
 
-func (this *selectString) Limit(limit int64) *selectString {
+func (this *selectSQL) Limit(limit int64) *selectSQL {
 	this.wherePtr.Limit(limit)
 	return this
 }
 
-func (this *selectString) GetSQL() string {
+func (this *selectSQL) GetSQL() string {
 	return this.wherePtr.ToString()
 }
 
-func (this *selectString) FetchRow(out interface{}, row *sql.Row) (bool, error) {
+func (this *selectSQL) GetObject(out interface{}, db *sql.DB) (bool, error) {
 	dest := reflect.ValueOf(out)
 
 	if dest.Type().Kind() == reflect.Ptr {
@@ -144,36 +140,33 @@ func (this *selectString) FetchRow(out interface{}, row *sql.Row) (bool, error) 
 		return false, errors.New(fmt.Sprintf("dest: %s is not a struct", vtype.Name()))
 	}
 
-	this.fieldArray = make(map[string]int)
+	var fieldArray []string
 	if this.wherePtr.fields != "*" {
-		fieldArray := strings.Split(this.wherePtr.fields, ",")
-		for index, field := range fieldArray {
-			this.fieldArray[field] = index
-		}
-	}
-
-	fieldCount := len(this.fieldArray)
-	scanArgs := make([]interface{}, fieldCount)
-
-	for i := 0; i < vtype.NumField(); i++ {
-		tag := vtype.Field(i).Tag.Get("db")
-		if len(tag) == 0 {
-			continue
-		}
-		arr := strings.Split(tag, ",")
-		key := arr[0]
-		if fieldCount > 0 {
-			idx, ok := this.fieldArray[key]
-			if !ok {
-				return false, errors.New(fmt.Sprintf("field: %s is not give", key))
+		fieldArray = strings.Split(this.wherePtr.fields, ",")
+	} else {
+		for i := 0; i < vtype.NumField(); i++ {
+			tag := strings.Trim(vtype.Field(i).Tag.Get("db"), " ")
+			if len(tag) == 0 || tag == "-" {
+				continue
 			}
-			scanArgs[idx] = dest.Field(i).Addr().Interface()
-		} else {
-			scanArgs = append(scanArgs, key)
+			arr := strings.Split(tag, " ")
+			fieldArray = append(fieldArray, arr[0])
 		}
 	}
+	fieldMapper := make(map[string]int)
+	for i, v := range fieldArray {
+		fieldMapper[v] = i
+	}
 
-	err := row.Scan(scanArgs...)
+	fieldCount := len(fieldArray)
+	valueArray := make([][]byte, fieldCount)
+	valueAddrArray := make([]interface{}, fieldCount)
+	for i := 0; i < fieldCount; i++ {
+		valueAddrArray[i] = &valueArray[i]
+	}
+
+	row := db.QueryRow(this.GetSQL())
+	err := row.Scan(valueAddrArray...)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
@@ -181,56 +174,149 @@ func (this *selectString) FetchRow(out interface{}, row *sql.Row) (bool, error) 
 		return false, err
 	}
 
-	return false, nil
+	for i := 0; i < vtype.NumField(); i++ {
+		tag := strings.Trim(vtype.Field(i).Tag.Get("db"), " ")
+		if len(tag) == 0 || tag == "-" {
+			continue
+		}
+		arr := strings.Split(tag, " ")
+		idx, ok := fieldMapper[arr[0]]
+		if !ok {
+			continue
+		}
+		str := string(valueArray[idx])
+		switch vtype.Field(i).Type.Kind() {
+		case reflect.String:
+			dest.Field(i).SetString(str)
+		case reflect.Bool:
+			val, err := strconv.ParseBool(str)
+			if err == nil {
+				dest.Field(i).SetBool(val)
+			}
+		case reflect.Float32, reflect.Float64:
+			val, err := strconv.ParseFloat(str, 64)
+			if err == nil {
+				dest.Field(i).SetFloat(val)
+			}
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			val, err := strconv.ParseInt(str, 0, 64)
+			if err == nil {
+				dest.Field(i).SetInt(val)
+			}
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			val, err := strconv.ParseUint(str, 0, 64)
+			if err == nil {
+				dest.Field(i).SetUint(val)
+			}
+		}
+	}
+
+	return true, nil
 }
 
-func (this *selectString) Fetch(out interface{}, rows *sql.Rows) (bool, error) {
-	dest := reflect.ValueOf(out)
-
-	if dest.Type().Kind() == reflect.Ptr {
-		dest = dest.Elem()
+func (this *selectSQL) GetObjectArray(out interface{}, db *sql.DB) (int, error) {
+	sliceType := reflect.TypeOf(out)
+	if sliceType.Kind() == reflect.Ptr {
+		sliceType = sliceType.Elem()
 	}
 
-	vtype := dest.Type()
-	if vtype.Kind() != reflect.Struct {
-		return false, errors.New(fmt.Sprintf("dest: %s is not a struct", vtype.Name()))
+	if sliceType.Kind() != reflect.Slice {
+		return 0, errors.New(fmt.Sprintf("dest: %s is not a slice", sliceType.Name()))
 	}
 
-	if this.wherePtr.fields != "*" && len(this.fieldArray) == 0 {
-		fieldArray := strings.Split(this.wherePtr.fields, ",")
-		for index, field := range fieldArray {
-			this.fieldArray[field] = index
-		}
+	memberType := sliceType.Elem()
+	memberIsPtr := false
+	if memberType.Kind() == reflect.Ptr {
+		memberType = memberType.Elem()
+		memberIsPtr = true
 	}
 
-	fieldCount := len(this.fieldArray)
-	scanArgs := make([]interface{}, fieldCount)
-
-	for i := 0; i < vtype.NumField(); i++ {
-		tag := vtype.Field(i).Tag.Get("db")
-		if len(tag) == 0 {
-			continue
-		}
-		arr := strings.Split(tag, ",")
-		key := arr[0]
-		if fieldCount > 0 {
-			idx, ok := this.fieldArray[key]
-			if !ok {
-				return false, errors.New(fmt.Sprintf("field: %s is not give", key))
+	var fieldArray []string
+	if this.wherePtr.fields != "*" {
+		fieldArray = strings.Split(this.wherePtr.fields, ",")
+	} else {
+		for i := 0; i < sliceType.NumField(); i++ {
+			tag := strings.Trim(sliceType.Field(i).Tag.Get("db"), " ")
+			if len(tag) == 0 || tag == "-" {
+				continue
 			}
-			scanArgs[idx] = dest.Field(i).Addr().Interface()
-		} else {
-			scanArgs = append(scanArgs, key)
+			arr := strings.Split(tag, " ")
+			fieldArray = append(fieldArray, arr[0])
 		}
 	}
+	fieldMapper := make(map[string]int)
+	for i, v := range fieldArray {
+		fieldMapper[v] = i
+	}
+	fieldCount := len(fieldArray)
 
-	err := rows.Scan(scanArgs...)
+	rows, err := db.Query(this.GetSQL())
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return false, nil
-		}
-		return false, err
+		return 0, err
 	}
 
-	return false, nil
+	count := 0
+	array := reflect.MakeSlice(sliceType, 0, 0)
+
+	for rows.Next() {
+		valueArray := make([][]byte, fieldCount)
+		valueAddrArray := make([]interface{}, fieldCount)
+		for i := 0; i < fieldCount; i++ {
+			valueAddrArray[i] = &valueArray[i]
+		}
+		err := rows.Scan(valueAddrArray...)
+		if err != nil {
+			return 0, err
+		}
+		count++
+
+		obj := reflect.New(memberType)
+		dest := obj.Elem()
+		for i := 0; i < memberType.NumField(); i++ {
+			tag := strings.Trim(memberType.Field(i).Tag.Get("db"), " ")
+			if len(tag) == 0 || tag == "-" {
+				continue
+			}
+			arr := strings.Split(tag, " ")
+			idx, ok := fieldMapper[arr[0]]
+			if !ok {
+				continue
+			}
+			str := string(valueArray[idx])
+			switch memberType.Field(i).Type.Kind() {
+			case reflect.String:
+				dest.Field(i).SetString(str)
+			case reflect.Bool:
+				val, err := strconv.ParseBool(str)
+				if err == nil {
+					dest.Field(i).SetBool(val)
+				}
+			case reflect.Float32, reflect.Float64:
+				val, err := strconv.ParseFloat(str, 64)
+				if err == nil {
+					dest.Field(i).SetFloat(val)
+				}
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				val, err := strconv.ParseInt(str, 0, 64)
+				if err == nil {
+					dest.Field(i).SetInt(val)
+				}
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				val, err := strconv.ParseUint(str, 0, 64)
+				if err == nil {
+					dest.Field(i).SetUint(val)
+				}
+			}
+		}
+		if memberIsPtr {
+			array = reflect.Append(array, obj)
+		} else {
+			array = reflect.Append(array, dest)
+		}
+	}
+
+	dest := reflect.ValueOf(out)
+	dest.Elem().Set(array)
+
+	return count, nil
 }

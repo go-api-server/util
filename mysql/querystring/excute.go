@@ -6,26 +6,26 @@ import (
 	"strings"
 )
 
-type excuteString struct {
-	wherePtr    *whereString
+type excuteSQL struct {
+	wherePtr    *whereMaker
 	updateArray []string
 }
 
-func Delete(table string) *excuteString {
-	return &excuteString{
-		wherePtr:    newWhereString("DELETE", table, ""),
+func Delete(table string) *excuteSQL {
+	return &excuteSQL{
+		wherePtr:    newWhereMaker("DELETE", table, ""),
 		updateArray: make([]string, 0),
 	}
 }
 
-func Update(table string) *excuteString {
-	return &excuteString{
-		wherePtr:    newWhereString("UPDATE", table, ""),
+func Update(table string) *excuteSQL {
+	return &excuteSQL{
+		wherePtr:    newWhereMaker("UPDATE", table, ""),
 		updateArray: make([]string, 0),
 	}
 }
 
-func (this *excuteString) Set(field string, value interface{}) *excuteString {
+func (this *excuteSQL) Set(field string, value interface{}) *excuteSQL {
 	valueof := reflect.ValueOf(value)
 	switch valueof.Type().Kind() {
 	case reflect.String:
@@ -42,55 +42,55 @@ func (this *excuteString) Set(field string, value interface{}) *excuteString {
 	return this
 }
 
-func (this *excuteString) SetMapping(fieldAndValue map[string]interface{}) *excuteString {
+func (this *excuteSQL) SetFieldAndValue(fieldAndValue map[string]interface{}) *excuteSQL {
 	for k, v := range fieldAndValue {
 		this.Set(k, v)
 	}
 	return this
 }
 
-func (this *excuteString) Where(where string) *excuteString {
+func (this *excuteSQL) Where(where string) *excuteSQL {
 	this.wherePtr.Where(where)
 	return this
 }
 
-func (this *excuteString) EQ(field string, value interface{}) *excuteString {
+func (this *excuteSQL) EQ(field string, value interface{}) *excuteSQL {
 	this.wherePtr.EQ(field, value)
 	return this
 }
 
-func (this *excuteString) GT(field string, value interface{}) *excuteString {
+func (this *excuteSQL) GT(field string, value interface{}) *excuteSQL {
 	this.wherePtr.GT(field, value)
 	return this
 }
 
-func (this *excuteString) GE(field string, value interface{}) *excuteString {
+func (this *excuteSQL) GE(field string, value interface{}) *excuteSQL {
 	this.wherePtr.GE(field, value)
 	return this
 }
 
-func (this *excuteString) LT(field string, value interface{}) *excuteString {
+func (this *excuteSQL) LT(field string, value interface{}) *excuteSQL {
 	this.wherePtr.LT(field, value)
 	return this
 }
 
-func (this *excuteString) LE(field string, value interface{}) *excuteString {
+func (this *excuteSQL) LE(field string, value interface{}) *excuteSQL {
 	this.wherePtr.LE(field, value)
 	return this
 }
 
-func (this *excuteString) IN(field string, intArray []int64) *excuteString {
+func (this *excuteSQL) IN(field string, intArray []int64) *excuteSQL {
 	this.wherePtr.IN(field, intArray)
 	return this
 }
 
-func (this *excuteString) Between(field string, min int, max int) *excuteString {
+func (this *excuteSQL) Between(field string, min int, max int) *excuteSQL {
 	this.wherePtr.GE(field, min)
 	this.wherePtr.LT(field, max)
 	return this
 }
 
-func (this *excuteString) GetSQL() string {
+func (this *excuteSQL) GetSQL() string {
 	this.wherePtr.fields = strings.Join(this.updateArray, ",")
 	return this.wherePtr.ToString()
 }
